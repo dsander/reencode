@@ -7,15 +7,15 @@ class Command
   end
 
   def command
-    "ffmpeg -y #{hardware_decode} -i #{source} -vcodec hevc_nvenc -profile:v main10 -preset hq -2pass 1 -vb #{file.bitrate}k -rc vbr_2pass #{ten_bit} -rc-lookahead 32 -c:a libfdk_aac -vbr 3 #{destination} 2>&1"
+    "ffmpeg -y #{hardware_decode} -i #{source.shellescape} -vcodec hevc_nvenc -profile:v main10 -preset hq -2pass 1 -vb #{file.bitrate}k -rc vbr_2pass #{ten_bit} -rc-lookahead 32 -c:a libfdk_aac -vbr 3 #{destination.shellescape} 2>&1"
   end
 
   def source
-    file.path.shellescape
+    file.path
   end
 
   def destination
-    File.basename file.path
+    File.basename(file.path)
   end
 
   def destination_size

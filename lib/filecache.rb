@@ -9,7 +9,7 @@ class Filecache
     unless @medium.mtime && @medium.mtime == stat.mtime.utc.to_i
       m = Mediainfo.new(f)
       @medium.width     = m.video.width
-      @medium.bit_depth = m.video.streams.map { |s| s['bit_depth']}.sort.last.gsub(/\D/, '').to_i
+      @medium.bit_depth = m.video.streams.map { |s| s['bit_depth'].gsub(/\D/, '').to_i }.sort.last rescue 8
       @medium.hevc      = m.video.streams.map(&:format).include?("HEVC")
       @medium.duration  = m.duration
       @medium.size      = stat.size / 1000.0
