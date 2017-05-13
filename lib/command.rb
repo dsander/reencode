@@ -31,7 +31,10 @@ class Command
   end
 
   def execute
-    output = `#{command}`
+    output = ''
+    time = Benchmark.realtime do
+      output = `#{command}`
+    end
 
     unless $?.success?
       puts "PROCESSING FAILED:"
@@ -39,7 +42,7 @@ class Command
       file.failed!
       cleanup!
     end
-    $?.success?
+    [$?.success?, time]
   end
 
   def cleanup!

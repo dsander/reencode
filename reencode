@@ -72,13 +72,14 @@ class Cli < Thor
   def perform(path)
     Reencode.work(options.merge(path: path)) do |file, c|
       next unless file.lock!
-      time = Benchmark.realtime do
-        c.execute
+
+      (success, time) = c.execute
+      if success
+        Reencode.shell.say "  Measurements:", :yellow
+        Reencode.shell.say "    Freed space  : #{Reencode.kb_to_human(file.size - c.destination_size)}"
+        Reencode.shell.say "    Encoding time: #{time.to_i} seconds"
+        FileUtils.mv(c.destination, file.path) if options['inplace']
       end
-      Reencode.shell.say "  Measurements:", :yellow
-      Reencode.shell.say "    Freed space  : #{Reencode.kb_to_human(file.size - c.destination_size)} GB"
-      Reencode.shell.say "    Encoding time: #{time.to_i} seconds"
-      FileUtils.mv(c.destination, file.path) if options['inplace']
       file.unlock!
     end
   end
