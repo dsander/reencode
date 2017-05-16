@@ -97,6 +97,16 @@ class Cli < Thor
     Reencode.shell.say "  Freed space  : #{Reencode.kb_to_human(saved)}"
     Reencode.shell.say "  Encoding time: #{(time / 3600.0 / 24.0).round(2)} days"
   end
+
+  desc 'unlock', 'Unlocks all entries in the database (use to clean up after processing crashed)'
+  def unlock
+    Medium.where(locked: true).update_all(locked: false)
+  end
+
+  desc 'retry', 'Unmarks all previously failed encodings to allow them to be retried on the next run'
+  def retry
+    Medium.where(failed: true).update_all(failed: false)
+  end
 end
 
 Cli.start
