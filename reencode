@@ -1,7 +1,9 @@
 #!/usr/bin/env ruby
 
+Thread.abort_on_exception = true
+
 require 'pp'
-require 'mediainfo'
+require 'mediainfo-native'
 require 'active_record'
 require 'active_support'
 require 'active_support/core_ext/numeric'
@@ -9,6 +11,7 @@ require 'shellwords'
 require 'fileutils'
 require 'thor'
 require 'benchmark'
+require 'komenda'
 
 require_relative 'lib/qualities'
 require_relative 'lib/medium'
@@ -16,36 +19,62 @@ require_relative 'lib/command'
 require_relative 'lib/filecache'
 require_relative 'lib/media_file'
 require_relative 'lib/reencode'
+require_relative 'lib/gpus'
 
 $stopping = false
-
-%w(INT TERM QUIT).each do |signal|
-  Signal.trap(signal) { $stopping = true }
-end
 
 class Cli < Thor
   desc "perform PATH", "Scans the directory recursively and re-encodes all found videos"
   method_option :inplace, type: :boolean, default: false, desc: "Replaces the source file with the re-encoded"
   method_option :hardware_decode, type: :boolean, default: false, desc: "Use hardware accelerated decoding method"
   def perform(path)
-    Reencode.work(options.merge(path: path)) do |file, c|
-      next unless file.lock!
+    encoders = Gpus.new
 
-      (success, time) = c.execute
-      if success
-        Reencode.shell.say "  Measurements:", :yellow
-        Reencode.shell.say "    Freed space  : #{Reencode.kb_to_human(file.size - c.destination_size)}"
-        Reencode.shell.say "    Encoding time: #{time.to_i} seconds"
-        FileUtils.mv(c.destination, file.path) if options['inplace']
+    status_thread = Thread.new do
+      while true
+        encoders.status
+        sleep 10
       end
-      file.unlock!
     end
+
+    distribute_thread = Thread.new do
+      Reencode.work(options.merge(path: path)) do |file, c|
+        next unless file.lock!
+
+        encoder = encoders.get
+
+        if $stopping
+          status_thread.kill
+          file.unlock!
+          break
+        end
+
+        estimate(file)
+        encoder.run(file, c, options) do |file, c, success, time|
+          finish(file, c, success, time)
+        end
+        sleep 1
+      end
+    end
+
+    %w(INT TERM QUIT).each do |signal|
+      Signal.trap(signal) do
+        $stopping = true
+        status_thread.kill
+        encoders.kill
+      end
+    end
+
+    distribute_thread.join
+    status_thread.join
+    encoders.join
   end
 
   desc "analyze PATH", "Scans the directory recursively and analyzes the potential saved space"
   def analyze(path)
     time = saved = 0
     Reencode.work(path: path) do |file, c|
+      estimate(file)
       time += file.guessed_encoding_time
       saved += file.size - file.guessed_size
     end
@@ -64,6 +93,30 @@ class Cli < Thor
   desc 'retry', 'Unmarks all previously failed encodings to allow them to be retried on the next run'
   def retry
     Medium.where(failed: true).update_all(failed: false)
+  end
+
+  private
+
+  def estimate(file)
+    Reencode.shell.say File.basename(file.path), :green
+    Reencode.shell.say "  Estimations:", :yellow
+    Reencode.shell.say "    Freed space  : #{Reencode.kb_to_human(file.size - file.guessed_size)}"
+    Reencode.shell.say "    Encoding time: #{file.guessed_encoding_time.to_i} seconds"
+  end
+
+  def finish(file, c, success, time)
+    file.unlock!
+    return if $stopping
+    if success
+      Reencode.shell.say "Processed '#{file.path}'", :green
+      Reencode.shell.say "  Measurements:", :yellow
+      Reencode.shell.say "    Freed space  : #{Reencode.kb_to_human(file.size - c.destination_size)}"
+      Reencode.shell.say "    Encoding time: #{time.to_i} seconds"
+      FileUtils.mv(c.destination, file.path) if options['inplace']
+    else
+      Reencode.shell.say "Error processing '#{file.path}':", :red
+      Reencode.shell.say c.output
+    end
   end
 end
 

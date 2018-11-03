@@ -1,17 +1,24 @@
 class Command
-  attr_reader :file
+  attr_reader :file, :output, :fps, :frame, :speed
+  attr_accessor :gpu
 
   def initialize(file, hardware_decode:)
     @hardware_decode = hardware_decode
     @file = file
+    @speed = @fps = @frame = 0
   end
 
   def command
-    "ffmpeg -y #{hardware_decode} -i #{source.shellescape} -vcodec hevc_nvenc -profile:v main10 -preset hq -2pass 1 -vb #{file.bitrate}k -rc vbr_2pass #{ten_bit} -rc-lookahead 32 -c:a libfdk_aac -vbr 3 #{destination.shellescape} 2>&1"
+    "ffmpeg -y #{hardware_decode} -i #{source.shellescape} -map_chapters -1 -vcodec hevc_nvenc -gpu #{gpu} -profile:v main10 -preset hq -2pass 1 -vb #{file.bitrate}k -rc vbr_hq #{ten_bit} -rc-lookahead 32 -c:a libfdk_aac -vbr 3 #{destination.shellescape}"
   end
 
   def source
     file.path
+  end
+
+  def gpu
+    return 'any' unless @gpu
+    @gpu
   end
 
   def destination
@@ -31,18 +38,35 @@ class Command
   end
 
   def execute
-    output = ''
+    @process = Komenda.create(command)
+    @process.on(:output) { |o| handle(o) }
+
+    result = nil
     time = Benchmark.realtime do
-      output = `#{command}`
+      result = @process.run
     end
 
-    unless $?.success?
-      puts "PROCESSING FAILED:"
-      puts output
-      file.failed!
+    unless result.success?
+      file.failed! unless @killed
       cleanup!
     end
-    [$?.success?, time]
+
+    [result.success?, time]
+  end
+
+  def handle(output)
+    @output ||= ""
+    @output += output
+    if m = output.match(/frame=\s*(?<frame>\d+).+?fps=\s*(?<fps>\d+).+?speed=\s*(?<speed>\d+.\d+).+?/)
+      @frame = m[:frame].to_i
+      @fps = m[:fps].to_i
+      @speed = m[:speed].to_f
+    end
+  end
+
+  def kill
+    @killed = true
+    @process.kill
   end
 
   def cleanup!

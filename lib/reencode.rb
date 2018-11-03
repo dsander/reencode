@@ -11,11 +11,6 @@ class Reencode
         c = Command.new(file, hardware_decode: options['hardware_decode'])
         next if File.exist?(c.destination)
 
-        Reencode.shell.say File.basename(f), :green
-        Reencode.shell.say "  Estimations:", :yellow
-        Reencode.shell.say "    Freed space  : #{Reencode.kb_to_human(file.size - file.guessed_size)}"
-        Reencode.shell.say "    Encoding time: #{file.guessed_encoding_time.to_i} seconds"
-
         yield file, c if block_given?
 
         if $stopping
