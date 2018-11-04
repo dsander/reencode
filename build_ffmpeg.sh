@@ -1,15 +1,6 @@
 #!/bin/bash
 set -e
 
-# Install CUDA and NVIDIA driver:
-
-# wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-repo-ubuntu1804_10.0.130-1_amd64.deb
-# sudo apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
-# apt-get update
-# apt-get install cuda
-# echo "export PATH=/usr/local/cuda-10.0/bin:~/bin:\$PATH" >> ~/.bashrc
-# echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:~/ffmpeg_build/lib/"  >> ~/.bashrc
-
 # This script will compile and install a ffmpeg build with support for nvenc on ubuntu.
 # See the prefix path and compile options if edits are needed to suit your needs.
 
@@ -17,7 +8,7 @@ set -e
 installLibs(){
 echo "Installing prerequisites"
 sudo apt-get update
-sudo apt-get -y --force-yes install autoconf automake build-essential libass-dev libfreetype6-dev libgpac-dev \
+sudo apt-get -y install autoconf automake build-essential libass-dev libfreetype6-dev libgpac-dev \
   libsdl1.2-dev libtheora-dev libtool libva-dev libvdpau-dev libvorbis-dev libxcb1-dev libxcb-shm0-dev \
   libxcb-xfixes0-dev pkg-config texi2html zlib1g-dev cmake mercurial nasm yasm
 }
@@ -142,10 +133,13 @@ PATH="$HOME/bin:$PATH" PKG_CONFIG_PATH="$HOME/ffmpeg_build/lib/pkgconfig" ./conf
   --enable-libvpx \
   --enable-libx264 \
   --enable-libx265 \
+  --enable-libass \
   --enable-nonfree \
   --nvccflags="-gencode arch=compute_61,code=sm_61 -O2" \
-  --enable-nvenc
-  # --enable-libass \
+  --enable-nvenc \
+  --enable-libnpp \
+  --enable-cuda \
+  --disable-cuda-sdk
   # --enable-vaapi \
 PATH="$HOME/bin:$PATH" make -j$(nproc)
 make -j$(nproc) install
