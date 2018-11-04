@@ -5,9 +5,8 @@ namespace :db do
   desc 'Create database'
   task :create do
     ActiveRecord::Base.connection.execute <<-EOS
-      CREATE SEQUENCE media_id_seq;
       CREATE TABLE media (
-       id integer NOT NULL DEFAULT nextval('media_id_seq'::regclass),
+       id INTEGER  NOT NULL PRIMARY KEY AUTOINCREMENT ,
        path text NOT NULL UNIQUE,
        mtime integer NOT NULL,
        width integer NOT NULL,

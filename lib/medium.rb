@@ -1,4 +1,4 @@
-ActiveRecord::Base.establish_connection(database: 'reencode', adapter: 'postgresql', user: 'reencode', password: 'password', host: 'htpc')
+ActiveRecord::Base.establish_connection(database: 'reencode.db', adapter: 'sqlite3')
 
 class Medium < ActiveRecord::Base
 end

@@ -37,6 +37,14 @@ class Cli < Thor
       end
     end
 
+    %w(INT TERM QUIT).each do |signal|
+      Signal.trap(signal) do
+        $stopping = true
+        status_thread.kill
+        encoders.kill
+      end
+    end
+
     distribute_thread = Thread.new do
       Reencode.work(options.merge(path: path)) do |file, c|
         next unless file.lock!
@@ -57,16 +65,7 @@ class Cli < Thor
       end
     end
 
-    %w(INT TERM QUIT).each do |signal|
-      Signal.trap(signal) do
-        $stopping = true
-        status_thread.kill
-        encoders.kill
-      end
-    end
-
     distribute_thread.join
-    status_thread.join
     encoders.join
   end
 
